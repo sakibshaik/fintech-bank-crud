@@ -1,15 +1,12 @@
 import { Router } from 'express';
 import {
-    createUser
+    createUser, getUser
 } from '../../controllers/userController.ts';
+import {requireAuth} from "../../middlewares/auth.ts";
 
 const router = Router();
 
-// router.get('/', getItems);
 router.post('/', createUser);
-// router.get('/:id', getItemById);
-// router.post('/', createItem);
-// router.put('/:id', updateItem);
-// router.delete('/:id', deleteItem);
+router.get('/:userId', requireAuth, getUser);
 
 export default router;

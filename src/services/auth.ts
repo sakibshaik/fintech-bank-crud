@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma.ts";
 import { UnauthorizedError } from "../middlewares/errorHandler.ts";
+import config from "../config/config.ts";
 
 export async function authenticateUser(email: string, password: string) {
     const user = await prisma.user.findUnique({ where: { email } });
@@ -11,5 +12,5 @@ export async function authenticateUser(email: string, password: string) {
         throw new UnauthorizedError("Invalid email or password");
     }
 
-    return jwt.sign({ sub: user.id }, process.env.JWT_SECRET!, { expiresIn: "1h" });
+    return jwt.sign({ sub: user.id }, config.jwtSecret, { expiresIn: "1h" });
 }

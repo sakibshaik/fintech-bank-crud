@@ -9,6 +9,10 @@ jest.mock('jsonwebtoken', () => ({
     __esModule: true,
     default: { sign: jest.fn() },
 }));
+jest.mock('../../src/config/config.ts', () => ({
+    __esModule: true,
+    default: { jwtSecret: 'test-secret', port: 3000, nodeEnv: 'test' },
+}));
 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -28,7 +32,6 @@ const userRow = (overrides: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-    process.env.JWT_SECRET = 'test-secret';
     findUnique.mockResolvedValue(userRow());
     compare.mockResolvedValue(true);
     sign.mockReturnValue('signed.jwt.token');

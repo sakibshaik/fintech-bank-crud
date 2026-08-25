@@ -29,3 +29,7 @@ export async function createUserService(input: CreateUserInput) {
         throw err;
     }
 }
+
+export async function getUserService(userId: string) {
+    return prisma.user.findUnique({ where: { id: userId } });
+}

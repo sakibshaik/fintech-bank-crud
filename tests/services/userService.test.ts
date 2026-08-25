@@ -1,5 +1,5 @@
 jest.mock('../../src/lib/prisma.ts', () => ({
-    prisma: { user: { create: jest.fn() } },
+    prisma: { user: { create: jest.fn(), findUnique: jest.fn() } },
 }));
 jest.mock('bcryptjs', () => ({
     __esModule: true,
@@ -7,12 +7,13 @@ jest.mock('bcryptjs', () => ({
 }));
 
 import bcrypt from 'bcryptjs';
-import { createUserService } from '../../src/services/userService.ts';
+import { createUserService, getUserService } from '../../src/services/userService.ts';
 import { prisma } from '../../src/lib/prisma.ts';
 import { BadRequestError } from '../../src/middlewares/errorHandler.ts';
 import type { CreateUserInput } from '../../src/schemas/userSchema.ts';
 
 const create = prisma.user.create as jest.Mock;
+const findUnique = prisma.user.findUnique as jest.Mock;
 const hash = bcrypt.hash as jest.Mock;
 
 const input = (overrides: Partial<CreateUserInput> = {}): CreateUserInput => ({
@@ -145,5 +146,20 @@ describe('createUserService — error translation', () => {
         create.mockRejectedValue(err);
 
         await expect(createUserService(input())).rejects.toBe(err);
+    });
+});
+
+describe('getUserService', () => {
+    it('returns the row when found', async () => {
+        findUnique.mockResolvedValue({ id: 'usr-abc123' });
+
+        await expect(getUserService('usr-abc123')).resolves.toEqual({ id: 'usr-abc123' });
+        expect(findUnique).toHaveBeenCalledWith({ where: { id: 'usr-abc123' } });
+    });
+
+    it('returns null when not found', async () => {
+        findUnique.mockResolvedValue(null);
+
+        await expect(getUserService('usr-nope')).resolves.toBeNull();
     });
 });

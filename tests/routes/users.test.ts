@@ -3,7 +3,7 @@ import request from 'supertest';
 // Mocked before importing the app: src/lib/prisma.ts constructs a PrismaClient at
 // module load, and these tests must not touch a real database.
 jest.mock('../../src/lib/prisma.ts', () => ({
-    prisma: { user: { create: jest.fn() } },
+    prisma: { user: { create: jest.fn(), findUnique: jest.fn() } },
 }));
 jest.mock('bcryptjs', () => ({
     __esModule: true,
@@ -13,9 +13,13 @@ jest.mock('bcryptjs', () => ({
 import app from '../../src/app.ts';
 import { prisma } from '../../src/lib/prisma.ts';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import config from '../../src/config/config.ts';
 
 const create = prisma.user.create as jest.Mock;
 const hash = bcrypt.hash as jest.Mock;
+const findUnique = prisma.user.findUnique as jest.Mock;
+const tokenFor = (userId: string) => jwt.sign({ sub: userId }, config.jwtSecret, { expiresIn: '1h' });
 
 const validPayload = (overrides: Record<string, unknown> = {}) => ({
     name: 'Ada Lovelace',
@@ -228,6 +232,68 @@ describe('POST /v1/users — failures from the data layer', () => {
 
         expect(res.status).toBe(500);
         expect(res.body).toEqual({ message: 'connection lost' });
+    });
+});
+
+describe('GET /v1/users/:userId', () => {
+    it("returns 200 with the caller's own user details", async () => {
+        findUnique.mockResolvedValue(dbRow());
+
+        const res = await request(app)
+            .get('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.id).toBe('usr-abc123');
+    });
+
+    it('returns 403 when the id belongs to another user', async () => {
+        findUnique.mockResolvedValue(dbRow()); // row's id is usr-abc123
+
+        const res = await request(app)
+            .get('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-someone-else')}`);
+
+        expect(res.status).toBe(403);
+    });
+
+    it('returns 404 for a nonexistent id, checked before ownership', async () => {
+        findUnique.mockResolvedValue(null);
+
+        const res = await request(app)
+            .get('/v1/users/usr-does-not-exist')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`);
+
+        expect(res.status).toBe(404);
+        expect(findUnique).toHaveBeenCalledWith({ where: { id: 'usr-does-not-exist' } });
+    });
+
+    it('returns 401 with no Authorization header', async () => {
+        const res = await request(app).get('/v1/users/usr-abc123');
+
+        expect(res.status).toBe(401);
+        expect(findUnique).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 for an expired token', async () => {
+        const expired = jwt.sign({ sub: 'usr-abc123' }, config.jwtSecret, { expiresIn: -10 });
+
+        const res = await request(app)
+            .get('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${expired}`);
+
+        expect(res.status).toBe(401);
+        expect(findUnique).not.toHaveBeenCalled();
+    });
+
+    it('never exposes the password hash', async () => {
+        findUnique.mockResolvedValue(dbRow());
+
+        const res = await request(app)
+            .get('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`);
+
+        expect(res.body).not.toHaveProperty('passwordHash');
     });
 });
 
