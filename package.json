@@ -1,0 +1,58 @@
+{
+  "name": "fintech-bank-crud",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "node --watch src/server.ts",
+    "lint": "eslint 'src/**/*.ts'",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "migrate:dev": "npx prisma migrate dev --name init"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sakibshaik/fintech-bank-crud.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sakibshaik/fintech-bank-crud/issues"
+  },
+  "homepage": "https://github.com/sakibshaik/fintech-bank-crud#readme",
+  "devDependencies": {
+    "@babel/core": "^8.0.1",
+    "@babel/preset-env": "^8.0.2",
+    "@babel/preset-typescript": "^8.0.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.3.0",
+    "@types/supertest": "^7.2.1",
+    "babel-jest": "^30.4.1",
+    "dotenv": "^17.4.2",
+    "eslint": "^10.9.1",
+    "express": "^5.2.1",
+    "install": "^0.13.0",
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.14",
+    "npm": "^11.19.0",
+    "prettier": "^3.9.6",
+    "prisma": "^5.22.0",
+    "supertest": "^7.2.2",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "zod": "^4.4.3"
+  }
+}

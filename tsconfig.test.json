@@ -1,0 +1,15 @@
+{
+  // Typecheck-only config for the test suite. Jest itself transpiles via babel
+  // and does no typechecking, so `npm run typecheck` is what catches type errors
+  // in tests/.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // tests/ sits outside the build's rootDir of ./src, so widen it here.
+    "rootDir": ".",
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node", "jest"]
+  },
+  "include": ["src", "tests"]
+}

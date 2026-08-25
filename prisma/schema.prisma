@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id
+  name         String
+  email        String    @unique
+  phoneNumber  String
+  addressLine1 String
+  addressLine2 String?
+  addressLine3 String?
+  town         String
+  county       String
+  postcode     String
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  accounts     Account[]
+}
+
+model Account {
+  accountNumber String        @id
+  sortCode      String        @default("10-10-10")
+  name          String
+  accountType   String        @default("personal")
+  balancePence  Int           @default(0)
+  currency      String        @default("GBP")
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions  Transaction[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Transaction {
+  id            String   @id
+  accountNumber String
+  account       Account  @relation(fields: [accountNumber], references: [accountNumber], onDelete: Restrict)
+  type          String
+  amountPence   Int
+  currency      String   @default("GBP")
+  reference     String?
+  createdAt     DateTime @default(now())
+}
