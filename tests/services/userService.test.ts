@@ -1,5 +1,8 @@
 jest.mock('../../src/lib/prisma.ts', () => ({
-    prisma: { user: { create: jest.fn(), findUnique: jest.fn() } },
+    prisma: {
+        user: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), delete: jest.fn() },
+        account: { count: jest.fn() },
+    },
 }));
 jest.mock('bcryptjs', () => ({
     __esModule: true,
@@ -7,13 +10,16 @@ jest.mock('bcryptjs', () => ({
 }));
 
 import bcrypt from 'bcryptjs';
-import { createUserService, getUserService } from '../../src/services/userService.ts';
+import { createUserService, getUserService, updateUserService, deleteUserService } from '../../src/services/userService.ts';
 import { prisma } from '../../src/lib/prisma.ts';
-import { BadRequestError } from '../../src/middlewares/errorHandler.ts';
-import type { CreateUserInput } from '../../src/schemas/userSchema.ts';
+import { BadRequestError, ConflictError } from '../../src/middlewares/errorHandler.ts';
+import type { CreateUserInput, UpdateUserInput } from '../../src/schemas/userSchema.ts';
 
 const create = prisma.user.create as jest.Mock;
 const findUnique = prisma.user.findUnique as jest.Mock;
+const update = prisma.user.update as jest.Mock;
+const del = prisma.user.delete as jest.Mock;
+const accountCount = prisma.account.count as jest.Mock;
 const hash = bcrypt.hash as jest.Mock;
 
 const input = (overrides: Partial<CreateUserInput> = {}): CreateUserInput => ({
@@ -161,5 +167,82 @@ describe('getUserService', () => {
         findUnique.mockResolvedValue(null);
 
         await expect(getUserService('usr-nope')).resolves.toBeNull();
+    });
+});
+
+describe('updateUserService', () => {
+    it('sends only the provided fields to Prisma', async () => {
+        update.mockResolvedValue({ id: 'usr-abc123' });
+
+        await updateUserService('usr-abc123', { name: 'Ada K. Lovelace' } as UpdateUserInput);
+
+        expect(update).toHaveBeenCalledWith({ where: { id: 'usr-abc123' }, data: { name: 'Ada K. Lovelace' } });
+    });
+
+    it('sends an empty data object for an empty input', async () => {
+        update.mockResolvedValue({ id: 'usr-abc123' });
+
+        await updateUserService('usr-abc123', {} as UpdateUserInput);
+
+        expect(update).toHaveBeenCalledWith({ where: { id: 'usr-abc123' }, data: {} });
+    });
+
+    it('flattens a fully-supplied address and nulls the omitted lines', async () => {
+        update.mockResolvedValue({ id: 'usr-abc123' });
+
+        await updateUserService('usr-abc123', {
+            address: { line1: '2 Low Street', town: 'Wells', county: 'Somerset', postcode: 'BA5 1AA' },
+        } as UpdateUserInput);
+
+        expect(update.mock.calls[0]?.[0].data).toEqual({
+            addressLine1: '2 Low Street',
+            addressLine2: null,
+            addressLine3: null,
+            town: 'Wells',
+            county: 'Somerset',
+            postcode: 'BA5 1AA',
+        });
+    });
+
+    it('translates a P2002 unique violation into BadRequestError', async () => {
+        update.mockRejectedValue(Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }));
+
+        await expect(
+            updateUserService('usr-abc123', { email: 'taken@example.com' } as UpdateUserInput)
+        ).rejects.toThrow(BadRequestError);
+    });
+
+    it('rethrows other Prisma errors untouched', async () => {
+        const err = Object.assign(new Error('Record not found'), { code: 'P2025' });
+        update.mockRejectedValue(err);
+
+        await expect(updateUserService('usr-abc123', { name: 'x' } as UpdateUserInput)).rejects.toBe(err);
+    });
+});
+
+describe('deleteUserService', () => {
+    it('deletes the user when they have no accounts', async () => {
+        accountCount.mockResolvedValue(0);
+        del.mockResolvedValue({ id: 'usr-abc123' });
+
+        await deleteUserService('usr-abc123');
+
+        expect(del).toHaveBeenCalledWith({ where: { id: 'usr-abc123' } });
+    });
+
+    it('throws ConflictError and does not delete when the user has an account', async () => {
+        accountCount.mockResolvedValue(1);
+
+        await expect(deleteUserService('usr-abc123')).rejects.toThrow(ConflictError);
+        expect(del).not.toHaveBeenCalled();
+    });
+
+    it('checks the count for the correct userId', async () => {
+        accountCount.mockResolvedValue(0);
+        del.mockResolvedValue({ id: 'usr-abc123' });
+
+        await deleteUserService('usr-abc123');
+
+        expect(accountCount).toHaveBeenCalledWith({ where: { userId: 'usr-abc123' } });
     });
 });

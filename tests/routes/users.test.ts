@@ -3,7 +3,10 @@ import request from 'supertest';
 // Mocked before importing the app: src/lib/prisma.ts constructs a PrismaClient at
 // module load, and these tests must not touch a real database.
 jest.mock('../../src/lib/prisma.ts', () => ({
-    prisma: { user: { create: jest.fn(), findUnique: jest.fn() } },
+    prisma: {
+        user: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), delete: jest.fn() },
+        account: { count: jest.fn() },
+    },
 }));
 jest.mock('bcryptjs', () => ({
     __esModule: true,
@@ -19,6 +22,9 @@ import config from '../../src/config/config.ts';
 const create = prisma.user.create as jest.Mock;
 const hash = bcrypt.hash as jest.Mock;
 const findUnique = prisma.user.findUnique as jest.Mock;
+const update = prisma.user.update as jest.Mock;
+const del = prisma.user.delete as jest.Mock;
+const accountCount = prisma.account.count as jest.Mock;
 const tokenFor = (userId: string) => jwt.sign({ sub: userId }, config.jwtSecret, { expiresIn: '1h' });
 
 const validPayload = (overrides: Record<string, unknown> = {}) => ({
@@ -297,6 +303,181 @@ describe('GET /v1/users/:userId', () => {
     });
 });
 
+describe('PATCH /v1/users/:userId', () => {
+    it("updates the caller's own details and returns 200 with the merged data", async () => {
+        findUnique.mockResolvedValue(dbRow());
+        update.mockResolvedValue(dbRow({ name: 'Ada K. Lovelace' }));
+
+        const res = await request(app)
+            .patch('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`)
+            .send({ name: 'Ada K. Lovelace' });
+
+        expect(res.status).toBe(200);
+        expect(res.body.name).toBe('Ada K. Lovelace');
+    });
+
+    it('only sends the fields that were provided to Prisma', async () => {
+        findUnique.mockResolvedValue(dbRow());
+        update.mockResolvedValue(dbRow());
+
+        await request(app)
+            .patch('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`)
+            .send({ name: 'Ada K. Lovelace' });
+
+        expect(update.mock.calls[0]?.[0].data).toEqual({ name: 'Ada K. Lovelace' });
+    });
+
+    it('replaces the full address when one is supplied', async () => {
+        findUnique.mockResolvedValue(dbRow());
+        update.mockResolvedValue(dbRow());
+
+        await request(app)
+            .patch('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`)
+            .send({
+                address: { line1: '2 Low Street', town: 'Wells', county: 'Somerset', postcode: 'BA5 1AA' },
+            });
+
+        expect(update.mock.calls[0]?.[0].data).toMatchObject({
+            addressLine1: '2 Low Street',
+            addressLine2: null,
+            addressLine3: null,
+            town: 'Wells',
+            county: 'Somerset',
+            postcode: 'BA5 1AA',
+        });
+    });
+
+    it('accepts an empty body as a no-op update', async () => {
+        findUnique.mockResolvedValue(dbRow());
+        update.mockResolvedValue(dbRow());
+
+        const res = await request(app)
+            .patch('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`)
+            .send({});
+
+        expect(res.status).toBe(200);
+        expect(update.mock.calls[0]?.[0].data).toEqual({});
+    });
+
+    it("returns 403 for another user's id without validating the body", async () => {
+        findUnique.mockResolvedValue(dbRow()); // row's id is usr-abc123
+
+        const res = await request(app)
+            .patch('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-someone-else')}`)
+            .send({ email: 'not-an-email' });
+
+        expect(res.status).toBe(403);
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for a nonexistent id, checked before ownership', async () => {
+        findUnique.mockResolvedValue(null);
+
+        const res = await request(app)
+            .patch('/v1/users/usr-does-not-exist')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`)
+            .send({ name: 'Ada K. Lovelace' });
+
+        expect(res.status).toBe(404);
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for an invalid field on the owner's own request", async () => {
+        findUnique.mockResolvedValue(dbRow());
+
+        const res = await request(app)
+            .patch('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`)
+            .send({ email: 'not-an-email' });
+
+        expect(res.status).toBe(400);
+        expect(update).not.toHaveBeenCalled();
+    });
+
+    it('returns 400 when the new email is already taken', async () => {
+        findUnique.mockResolvedValue(dbRow());
+        update.mockRejectedValue(Object.assign(new Error('Unique constraint'), { code: 'P2002' }));
+
+        const res = await request(app)
+            .patch('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`)
+            .send({ email: 'taken@example.com' });
+
+        expect(res.status).toBe(400);
+        expect(res.body.details).toEqual([{ field: 'email', message: 'Email already in use', type: 'unique' }]);
+    });
+
+    it('returns 401 with no Authorization header', async () => {
+        const res = await request(app).patch('/v1/users/usr-abc123').send({ name: 'x' });
+
+        expect(res.status).toBe(401);
+        expect(findUnique).not.toHaveBeenCalled();
+    });
+});
+
+describe('DELETE /v1/users/:userId', () => {
+    it("deletes the caller's own user and returns 204 with no body", async () => {
+        findUnique.mockResolvedValue(dbRow());
+        accountCount.mockResolvedValue(0);
+        del.mockResolvedValue(dbRow());
+
+        const res = await request(app)
+            .delete('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`);
+
+        expect(res.status).toBe(204);
+        expect(res.body).toEqual({});
+        expect(del).toHaveBeenCalledWith({ where: { id: 'usr-abc123' } });
+    });
+
+    it('returns 409 and does not delete when the user has a bank account', async () => {
+        findUnique.mockResolvedValue(dbRow());
+        accountCount.mockResolvedValue(1);
+
+        const res = await request(app)
+            .delete('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`);
+
+        expect(res.status).toBe(409);
+        expect(del).not.toHaveBeenCalled();
+    });
+
+    it("returns 403 for another user's id", async () => {
+        findUnique.mockResolvedValue(dbRow()); // row's id is usr-abc123
+
+        const res = await request(app)
+            .delete('/v1/users/usr-abc123')
+            .set('Authorization', `Bearer ${tokenFor('usr-someone-else')}`);
+
+        expect(res.status).toBe(403);
+        expect(accountCount).not.toHaveBeenCalled();
+        expect(del).not.toHaveBeenCalled();
+    });
+
+    it('returns 404 for a nonexistent id, checked before ownership', async () => {
+        findUnique.mockResolvedValue(null);
+
+        const res = await request(app)
+            .delete('/v1/users/usr-does-not-exist')
+            .set('Authorization', `Bearer ${tokenFor('usr-abc123')}`);
+
+        expect(res.status).toBe(404);
+        expect(del).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 with no Authorization header', async () => {
+        const res = await request(app).delete('/v1/users/usr-abc123');
+
+        expect(res.status).toBe(401);
+        expect(findUnique).not.toHaveBeenCalled();
+    });
+});
+
 // These assertions describe the surface as currently mounted in src/app.ts.
 // Uncommenting a route in src/routes/v1/userRoute.ts should turn the matching
 // case here red — that is the signal to write real coverage for it.
@@ -304,7 +485,6 @@ describe('unmounted routes', () => {
     it.each([
         ['get', '/v1/users'],
         ['put', '/v1/users/usr-abc123'],
-        ['delete', '/v1/users/usr-abc123'],
     ])('404s on %s %s', async (method, path) => {
         const res = await (request(app) as any)[method](path);
 

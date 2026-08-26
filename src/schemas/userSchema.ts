@@ -18,3 +18,12 @@ export const createUserSchema = z.object({
 });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
+
+export const updateUserSchema = z.object({
+    name: z.string().min(1).optional(),
+    address: addressSchema.optional(),
+    phoneNumber: z.string().regex(/^\+[1-9]\d{1,14}$/).optional(),
+    email: z.string().email().optional(),
+});
+
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;

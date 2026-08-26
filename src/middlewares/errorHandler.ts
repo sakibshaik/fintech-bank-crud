@@ -35,8 +35,6 @@ export interface ValidationDetail {
 }
 
 export class BadRequestError extends Error {
-    // Declared as a field rather than a constructor parameter property: Node's
-    // strip-only type stripping cannot desugar `constructor(public details)`.
     details: ValidationDetail[];
 
     constructor(details: ValidationDetail[]) {
@@ -50,5 +48,12 @@ export class UnauthorizedError extends Error {
     constructor(message: string) {
         super(message);
         this.name = 'UnauthorizedError';
+    }
+}
+
+export class ConflictError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'ConflictError';
     }
 }
