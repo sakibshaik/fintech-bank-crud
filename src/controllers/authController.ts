@@ -1,7 +1,7 @@
 import type {Request, Response, NextFunction} from 'express';
-import {authenticateUser} from "../services/auth.ts";
+import {authenticateUser} from "../services/authSchema.ts";
 import {toBadRequestResponse, UnauthorizedError} from "../middlewares/errorHandler.ts";
-import {loginSchema} from "../schemas/auth.ts";
+import {loginSchema} from "../schemas/authSchema.ts";
 
 export const login = async (req: Request, res: Response, next: NextFunction) => {
     const result = loginSchema.safeParse(req.body);

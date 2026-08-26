@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
     login
-} from '../../controllers/auth.ts';
+} from '../../controllers/authController.ts';
 
 const router = Router();
 

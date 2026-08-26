@@ -1,4 +1,4 @@
-import { loginSchema } from '../../src/schemas/auth.ts';
+import { loginSchema } from '../../src/schemas/authSchema.ts';
 
 const valid = () => ({ email: 'ada@example.com', password: 'correct-horse' });
 
