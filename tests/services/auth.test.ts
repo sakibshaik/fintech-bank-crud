@@ -16,7 +16,7 @@ jest.mock('../../src/config/config.ts', () => ({
 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { authenticateUser } from '../../src/services/authSchema.ts';
+import { authenticateUser } from '../../src/services/authService.ts';
 import { prisma } from '../../src/lib/prisma.ts';
 import { UnauthorizedError } from '../../src/middlewares/errorHandler.ts';
 

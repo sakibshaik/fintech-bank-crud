@@ -1,5 +1,5 @@
 import type {Request, Response, NextFunction} from 'express';
-import {authenticateUser} from "../services/authSchema.ts";
+import {authenticateUser} from "../services/authService.ts";
 import {toBadRequestResponse, UnauthorizedError} from "../middlewares/errorHandler.ts";
 import {loginSchema} from "../schemas/authSchema.ts";
 
