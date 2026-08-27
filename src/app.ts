@@ -13,6 +13,7 @@ app.use('/v1/users', userRoutes);
 app.use('/v1/auth/login', authRoutes);
 app.use('/v1/accounts', accountRoutes)
 
+
 // Global error handler (should be after routes)
 app.use(errorHandler);
 
