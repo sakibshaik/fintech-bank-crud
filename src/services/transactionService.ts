@@ -38,3 +38,16 @@ export async function createTransactionService(accountNumber: string, input: Cre
         });
     });
 }
+
+export async function listTransactionsService(accountNumber: string) {
+    return prisma.transaction.findMany({
+        where: { accountNumber },
+        orderBy: { createdAt: 'asc' },
+    });
+}
+
+export async function getTransactionService(accountNumber: string, transactionId: string) {
+    return prisma.transaction.findFirst({
+        where: { id: transactionId, accountNumber },
+    });
+}
