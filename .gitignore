@@ -141,3 +141,9 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# SQLite database files — never commit real data, only migrations
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3

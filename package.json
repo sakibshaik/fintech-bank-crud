@@ -13,6 +13,7 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "typecheck": "tsc -p tsconfig.test.json",
+      "postinstall": "prisma generate",
     "migrate:dev": "npx prisma migrate dev --name init"
   },
   "repository": {
@@ -26,6 +27,9 @@
     "url": "https://github.com/sakibshaik/fintech-bank-crud/issues"
   },
   "homepage": "https://github.com/sakibshaik/fintech-bank-crud#readme",
+  "engines": {
+    "node": ">=22.6.0"
+  },
   "devDependencies": {
     "@babel/core": "^8.0.1",
     "@babel/preset-env": "^8.0.2",
